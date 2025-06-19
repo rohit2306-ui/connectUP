@@ -80,13 +80,16 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  const formatDate = (date: Date | string) => {
+  const parsedDate = new Date(date);
+  if (isNaN(parsedDate.getTime())) return 'Invalid date';
+
+  return parsedDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
 
   if (!user) return null;
 
