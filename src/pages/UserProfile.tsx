@@ -20,18 +20,21 @@ const UserProfile: React.FC = () => {
       if (!username) return;
 
       setLoading(true);
-      
+
       try {
         const foundUser = await getUserByUsername(username);
-        
-        if (!foundUser) {
+        if (!foundUser || !foundUser.id) {
+          console.error('User not found or missing ID');
           setNotFound(true);
-          setLoading(false);
           return;
         }
 
         setUser(foundUser);
+
+        console.log('Found user ID for post fetching:', foundUser.id);
         const posts = await getPostsByUserId(foundUser.id);
+
+        console.log('Posts fetched:', posts.length);
         setUserPosts(posts);
       } catch (error) {
         console.error('Error loading user profile:', error);
@@ -44,18 +47,16 @@ const UserProfile: React.FC = () => {
     loadUserProfile();
   }, [username]);
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (date: Date | string) => {
+    const parsedDate = new Date(date);
+    return parsedDate.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
-  if (notFound) {
-    return <Navigate to="/search" replace />;
-  }
-
+  if (notFound) return <Navigate to="/search" replace />;
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -72,7 +73,6 @@ const UserProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Back Button */}
         <Button
           variant="ghost"
           onClick={() => window.history.back()}
@@ -82,19 +82,16 @@ const UserProfile: React.FC = () => {
           Back
         </Button>
 
-        {/* Profile Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
           <div className="flex items-start space-x-6">
-            {/* Avatar */}
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
               {user.name.charAt(0)}
             </div>
 
-            {/* Profile Info */}
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{user.name}</h1>
               <p className="text-gray-600 dark:text-gray-400 mb-4">@{user.username}</p>
-              
+
               <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-4 w-4" />
@@ -109,7 +106,6 @@ const UserProfile: React.FC = () => {
           </div>
         </div>
 
-        {/* Posts Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -122,21 +118,13 @@ const UserProfile: React.FC = () => {
               <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">📝</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No posts yet
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                {user.name} hasn't shared any thoughts yet.
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No posts yet</h3>
+              <p className="text-gray-600 dark:text-gray-400">{user.name} hasn't shared any thoughts yet.</p>
             </div>
           ) : (
             <div className="p-6 space-y-6">
               {userPosts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  showActions={false}
-                />
+                <PostCard key={post.id} post={post} showActions={false} />
               ))}
             </div>
           )}

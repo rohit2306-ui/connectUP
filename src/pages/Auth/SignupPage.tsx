@@ -5,9 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/UI/Button';
 import Input from '../../components/UI/Input';
-import { useNavigate } from 'react-router-dom';
-
-const navigate = useNavigate();
 
 const SignupPage: React.FC = () => {
   const { signup, loading, user } = useAuth();
@@ -66,20 +63,17 @@ const SignupPage: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
 
-  if (!validateForm()) {
-    return;
-  }
-
-  const success = await signup(formData);
-  if (!success) {
-    setErrors({ general: 'Username or email already exists' });
-  } else {
-    navigate('/feed'); // redirect to feed or dashboard
-  }
-};
-
+    const success = await signup(formData);
+    if (!success) {
+      setErrors({ general: 'Username or email already exists' });
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
