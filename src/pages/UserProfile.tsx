@@ -48,13 +48,15 @@ const UserProfile: React.FC = () => {
   }, [username]);
 
   const formatDate = (date: Date | string) => {
-    const parsedDate = new Date(date);
-    return parsedDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
+  const parsedDate = new Date(date);
+  if (isNaN(parsedDate.getTime())) return 'Invalid date';
+
+  return parsedDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
 
   if (notFound) return <Navigate to="/search" replace />;
   if (loading) {

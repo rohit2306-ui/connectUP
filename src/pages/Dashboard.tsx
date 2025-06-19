@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Trash2, Heart, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Post } from '../types';
-import { getPostsByUserId, deletePost } from '../services/postService';
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
 import { updateUserProfile } from '../services/authService';
 import Button from '../components/UI/Button';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
@@ -22,38 +24,39 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   const loadUserPosts = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const posts = await getPostsByUserId(user.id);
-      setUserPosts(posts);
-    } catch (error) {
-      console.error('Error loading user posts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!user) return;
+
+  setLoading(true);
+  try {
+    const q = query(collection(db, 'posts'), where('userId', '==', user.id));
+    const querySnapshot = await getDocs(q);
+
+    const posts: Post[] = [];
+    querySnapshot.forEach((docSnap) => {
+      posts.push({ id: docSnap.id, ...docSnap.data() } as Post);
+    });
+
+    setUserPosts(posts);
+  } catch (error) {
+    console.error('Error loading user posts:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleDeletePost = async (postId: string) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) {
-      return;
-    }
+  if (!window.confirm('Are you sure you want to delete this post?')) return;
 
-    if (!user) return;
+  try {
+    await deleteDoc(doc(db, 'posts', postId));
+    setUserPosts(prev => prev.filter(post => post.id !== postId));
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    alert('Failed to delete post. Please try again.');
+  }
+};
 
-    try {
-      const success = await deletePost(postId, user.id);
-      if (success) {
-        setUserPosts(prev => prev.filter(post => post.id !== postId));
-      } else {
-        alert('Failed to delete post. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      alert('Failed to delete post. Please try again.');
-    }
-  };
 
   const handleEditName = () => {
     setIsEditing(true);
@@ -90,6 +93,7 @@ const Dashboard: React.FC = () => {
     day: 'numeric',
   });
 };
+
 
   if (!user) return null;
 
