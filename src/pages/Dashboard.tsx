@@ -180,9 +180,9 @@ const Dashboard: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Share your first thought with the community!
               </p>
-              <Button onClick={() => window.location.href = '/create'}>
+{/*               <Button onClick={() => window.location.href = '/create'}>
                 Create Your First Post
-              </Button>
+              </Button> */}
             </div>
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
