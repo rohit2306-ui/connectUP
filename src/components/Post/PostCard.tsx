@@ -12,11 +12,11 @@ interface PostCardProps {
   showActions?: boolean;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ 
-  post, 
-  onLike, 
-  onDelete, 
-  showActions = true 
+const PostCard: React.FC<PostCardProps> = ({
+  post,
+  onLike,
+  onDelete,
+  showActions = true
 }) => {
   const { user } = useAuth();
   const [showComments, setShowComments] = useState(false);
@@ -28,7 +28,6 @@ const PostCard: React.FC<PostCardProps> = ({
   const formatDate = (date: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 48) return 'Yesterday';
@@ -47,13 +46,12 @@ const PostCard: React.FC<PostCardProps> = ({
         await navigator.share({
           title: `${post.name}'s thought`,
           text: post.content,
-          url: window.location.href,
+          url: window.location.href
         });
-      } catch (error) {
-        // User cancelled or error occurred
+      } catch (_) {
+        // Handle share cancel/error silently
       }
     } else {
-      // Fallback: copy to clipboard
       navigator.clipboard.writeText(`${post.content} - ${post.name} on ConnectUp`);
     }
   };
@@ -100,6 +98,15 @@ const PostCard: React.FC<PostCardProps> = ({
           )}
         </div>
 
+        {/* Image (if any) */}
+        {post.imageUrl && (
+          <img
+            src={post.imageUrl}
+            alt="Post visual"
+            className="w-full max-h-[400px] object-cover rounded-md mb-4"
+          />
+        )}
+
         {/* Content */}
         <div className="mb-4">
           <p className="text-gray-900 dark:text-white leading-relaxed">{post.content}</p>
@@ -141,12 +148,9 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </div>
 
-      {/* Comments Modal */}
+      {/* Comment Modal */}
       {showComments && (
-        <CommentModal
-          post={post}
-          onClose={() => setShowComments(false)}
-        />
+        <CommentModal post={post} onClose={() => setShowComments(false)} />
       )}
     </>
   );

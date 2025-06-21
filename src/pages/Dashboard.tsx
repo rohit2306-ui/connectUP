@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Edit3, Trash2, Heart, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Post } from '../types';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  doc
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 import { updateUserProfile } from '../services/authService';
@@ -24,39 +31,44 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   const loadUserPosts = async () => {
-  if (!user) return;
-
-  setLoading(true);
-  try {
-    const q = query(collection(db, 'posts'), where('userId', '==', user.id));
-    const querySnapshot = await getDocs(q);
-
-    const posts: Post[] = [];
-    querySnapshot.forEach((docSnap) => {
-      posts.push({ id: docSnap.id, ...docSnap.data() } as Post);
-    });
-
-    setUserPosts(posts);
-  } catch (error) {
-    console.error('Error loading user posts:', error);
-  } finally {
-    setLoading(false);
-  }
-};
-
+    if (!user) return;
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'posts'), where('userId', '==', user.id));
+      const querySnapshot = await getDocs(q);
+      const posts: Post[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        posts.push({
+          id: docSnap.id,
+          userId: data.userId,
+          username: data.username,
+          name: data.name,
+          content: data.content,
+          imageUrl: data.imageUrl || '',
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          likes: data.likes || [],
+          comments: data.comments || []
+        });
+      });
+      setUserPosts(posts);
+    } catch (error) {
+      console.error('Error loading user posts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDeletePost = async (postId: string) => {
-  if (!window.confirm('Are you sure you want to delete this post?')) return;
-
-  try {
-    await deleteDoc(doc(db, 'posts', postId));
-    setUserPosts(prev => prev.filter(post => post.id !== postId));
-  } catch (error) {
-    console.error('Error deleting post:', error);
-    alert('Failed to delete post. Please try again.');
-  }
-};
-
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    try {
+      await deleteDoc(doc(db, 'posts', postId));
+      setUserPosts((prev) => prev.filter((post) => post.id !== postId));
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post. Please try again.');
+    }
+  };
 
   const handleEditName = () => {
     setIsEditing(true);
@@ -65,12 +77,10 @@ const Dashboard: React.FC = () => {
 
   const handleSaveName = async () => {
     if (!editedName.trim() || !user) return;
-
     setUpdating(true);
     try {
       const success = await updateUserProfile(user.id, { name: editedName.trim() });
       if (success) {
-        // The auth context will automatically update when Firebase Auth profile changes
         setIsEditing(false);
       } else {
         alert('Failed to update name. Please try again.');
@@ -84,16 +94,14 @@ const Dashboard: React.FC = () => {
   };
 
   const formatDate = (date: Date | string) => {
-  const parsedDate = new Date(date);
-  if (isNaN(parsedDate.getTime())) return 'Invalid date';
-
-  return parsedDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-};
-
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) return 'Invalid date';
+    return parsedDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   if (!user) return null;
 
@@ -103,12 +111,10 @@ const Dashboard: React.FC = () => {
         {/* Profile Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
           <div className="flex items-start space-x-6">
-            {/* Avatar */}
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
               {user.name.charAt(0)}
             </div>
 
-            {/* Profile Info */}
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
                 {isEditing ? (
@@ -131,17 +137,17 @@ const Dashboard: React.FC = () => {
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{user.name}</h1>
                     <button
                       onClick={handleEditName}
-                      className="p-1 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors duration-200"
+                      className="p-1 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                     >
                       <Edit3 className="h-4 w-4" />
                     </button>
                   </>
                 )}
               </div>
-              
+
               <p className="text-gray-600 dark:text-gray-400 mb-1">@{user.username}</p>
               <p className="text-gray-600 dark:text-gray-400 mb-4">{user.email}</p>
-              
+
               <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-4 w-4" />
@@ -164,31 +170,24 @@ const Dashboard: React.FC = () => {
 
           {loading ? (
             <div className="flex justify-center items-center py-12">
-              <div className="text-center">
-                <LoadingSpinner size="lg" className="mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">Loading your posts...</p>
-              </div>
+              <LoadingSpinner size="lg" className="mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Loading your posts...</p>
             </div>
           ) : userPosts.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">📝</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No posts yet
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No posts yet</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Share your first thought with the community!
               </p>
-{/*               <Button onClick={() => window.location.href = '/create'}>
-                Create Your First Post
-              </Button> */}
             </div>
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {userPosts.map((post) => (
-                <div key={post.id} className="p-6">
-                  <div className="flex justify-between items-start mb-4">
+                <div key={post.id} className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(post.createdAt)}
                     </div>
@@ -200,18 +199,29 @@ const Dashboard: React.FC = () => {
                     </button>
                   </div>
 
-                  <p className="text-gray-900 dark:text-white leading-relaxed mb-4">
-                    {post.content}
-                  </p>
+                  {/* Content and Image */}
+                  <div className="space-y-3">
+                    {post.content && (
+                      <p className="text-gray-900 dark:text-white leading-relaxed">{post.content}</p>
+                    )}
+                    {post.imageUrl && (
+                      <img
+                        src={post.imageUrl}
+                        alt="Post"
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 max-h-96 object-cover"
+                      />
+                    )}
+                  </div>
 
-                  <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
+                  {/* Reactions */}
+                  <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400 pt-2">
                     <div className="flex items-center space-x-2">
                       <Heart className="h-4 w-4" />
-                      <span>{post.likes.length} likes</span>
+                      <span>{post.likes?.length || 0} likes</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <MessageCircle className="h-4 w-4" />
-                      <span>{post.comments.length} comments</span>
+                      <span>{post.comments?.length || 0} comments</span>
                     </div>
                   </div>
                 </div>

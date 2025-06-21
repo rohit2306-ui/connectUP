@@ -12,13 +12,21 @@ export interface User {
 export interface Post {
   id: string;
   userId: string;
-  username: string;
   name: string;
+  username: string;
   content: string;
+  imageUrl?: string; // ✅ optional imageUrl
+  likes: string[];
+  comments: {
+    id: string;
+    userId: string;
+    name: string;
+    content: string;
+    createdAt: string;
+  }[];
   createdAt: Date;
-  likes: string[]; // Array of user IDs who liked
-  comments: Comment[];
 }
+
 
 // Comment interface
 export interface Comment {

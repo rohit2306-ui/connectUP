@@ -1,14 +1,14 @@
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  orderBy, 
-  where, 
-  arrayUnion, 
+import {
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  where,
+  arrayUnion,
   arrayRemove,
   onSnapshot,
   Timestamp,
@@ -17,21 +17,25 @@ import {
 import { db } from '../config/firebase';
 import { Post, Comment } from '../types';
 
-export const createPost = async (userId: string, content: string): Promise<{ success: boolean; error?: string }> => {
+// ✅ Create a new post
+export const createPost = async (
+  userId: string,
+  content: string,
+  imageUrl: string = ''
+): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Get user data first
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (!userDoc.exists()) {
-      return { success: false, error: 'User not found' };
-    }
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) return { success: false, error: 'User not found' };
 
-    const userData = userDoc.data();
-    
+    const userData = userSnap.data();
+
     const postData = {
       userId,
-      username: userData.username,
-      name: userData.name,
+      username: userData?.username || '',
+      name: userData?.name || '',
       content: content.trim(),
+      imageUrl,
       createdAt: Timestamp.now(),
       likes: [],
       comments: []
@@ -40,31 +44,33 @@ export const createPost = async (userId: string, content: string): Promise<{ suc
     await addDoc(collection(db, 'posts'), postData);
     return { success: true };
   } catch (error: any) {
-    console.error('Error creating post:', error);
+    console.error('Error creating post:', error.message);
     return { success: false, error: error.message };
   }
 };
 
+// ✅ Get all posts
 export const getPosts = async (): Promise<Post[]> => {
   try {
-    const postsQuery = query(
-      collection(db, 'posts'), 
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(postsQuery);
-    
+    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
     const posts: Post[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       posts.push({
-        id: doc.id,
+        id: docSnap.id,
         userId: data.userId,
-        username: data.username,
-        name: data.name,
+        username: data.username || '',
+        name: data.name || '',
         content: data.content,
-        createdAt: data.createdAt.toDate(),
+        imageUrl: data.imageUrl || '',
+        createdAt: data.createdAt?.toDate?.() || new Date(),
         likes: data.likes || [],
-        comments: data.comments || []
+        comments: (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate?.() || new Date()
+        }))
       });
     });
 
@@ -75,81 +81,81 @@ export const getPosts = async (): Promise<Post[]> => {
   }
 };
 
+// ✅ Get posts by a specific user
 export const getPostsByUserId = async (userId: string): Promise<Post[]> => {
   try {
-    const postsQuery = query(
-      collection(db, 'posts'), 
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(postsQuery);
-    
+    const q = query(collection(db, 'posts'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+
     const posts: Post[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+
       posts.push({
-        id: doc.id,
+        id: docSnap.id,
         userId: data.userId,
         username: data.username,
         name: data.name,
         content: data.content,
+        imageUrl: data.imageUrl || '',
         createdAt: data.createdAt.toDate(),
         likes: data.likes || [],
-        comments: data.comments || []
+        comments: (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt.toDate(),
+        }))
       });
     });
 
     return posts;
   } catch (error) {
-    console.error('Error getting user posts:', error);
+    console.error('Error in getPostsByUserId:', error);
     return [];
   }
 };
 
+
+// ✅ Like or unlike a post
 export const likePost = async (postId: string, userId: string): Promise<boolean> => {
   try {
     const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
-    
-    if (!postDoc.exists()) return false;
-    
-    const postData = postDoc.data();
-    const likes = postData.likes || [];
-    
+    const postSnap = await getDoc(postRef);
+    if (!postSnap.exists()) return false;
+
+    const data = postSnap.data();
+    const likes = data.likes || [];
+
     if (likes.includes(userId)) {
-      // Unlike the post
-      await updateDoc(postRef, {
-        likes: arrayRemove(userId)
-      });
+      await updateDoc(postRef, { likes: arrayRemove(userId) });
     } else {
-      // Like the post
-      await updateDoc(postRef, {
-        likes: arrayUnion(userId)
-      });
+      await updateDoc(postRef, { likes: arrayUnion(userId) });
     }
-    
+
     return true;
   } catch (error) {
-    console.error('Error liking post:', error);
+    console.error('Error liking/unliking post:', error);
     return false;
   }
 };
 
-export const addComment = async (postId: string, userId: string, content: string): Promise<{ success: boolean; error?: string }> => {
+// ✅ Add a comment to a post
+export const addComment = async (
+  postId: string,
+  userId: string,
+  content: string
+): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Get user data
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (!userDoc.exists()) {
+    const userSnap = await getDoc(doc(db, 'users', userId));
+    if (!userSnap.exists()) {
       return { success: false, error: 'User not found' };
     }
 
-    const userData = userDoc.data();
-    
+    const userData = userSnap.data();
     const comment: Comment = {
-      id: Date.now().toString(), // Simple ID generation
+      id: Date.now().toString(),
       userId,
-      username: userData.username,
-      name: userData.name,
+      username: userData.username || '',
+      name: userData.name || '',
       content: content.trim(),
       createdAt: new Date()
     };
@@ -164,23 +170,21 @@ export const addComment = async (postId: string, userId: string, content: string
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error adding comment:', error);
+    console.error('Error adding comment:', error.message);
     return { success: false, error: error.message };
   }
 };
 
+// ✅ Delete a post
 export const deletePost = async (postId: string, userId: string): Promise<boolean> => {
   try {
     const postRef = doc(db, 'posts', postId);
-    const postDoc = await getDoc(postRef);
-    
-    if (!postDoc.exists()) return false;
-    
-    const postData = postDoc.data();
-    
-    // Check if the current user owns the post
-    if (postData.userId !== userId) return false;
-    
+    const postSnap = await getDoc(postRef);
+
+    if (!postSnap.exists()) return false;
+    const data = postSnap.data();
+    if (data.userId !== userId) return false;
+
     await deleteDoc(postRef);
     return true;
   } catch (error) {
@@ -189,27 +193,26 @@ export const deletePost = async (postId: string, userId: string): Promise<boolea
   }
 };
 
+// ✅ Real-time subscription to all posts
 export const subscribeToPostsRealtime = (callback: (posts: Post[]) => void) => {
-  const postsQuery = query(
-    collection(db, 'posts'), 
-    orderBy('createdAt', 'desc')
-  );
+  const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
 
-  return onSnapshot(postsQuery, (querySnapshot) => {
+  return onSnapshot(q, (snapshot) => {
     const posts: Post[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
       posts.push({
-        id: doc.id,
+        id: docSnap.id,
         userId: data.userId,
-        username: data.username,
-        name: data.name,
+        username: data.username || '',
+        name: data.name || '',
         content: data.content,
-        createdAt: data.createdAt.toDate(),
+        imageUrl: data.imageUrl || '',
+        createdAt: data.createdAt?.toDate?.() || new Date(),
         likes: data.likes || [],
-        comments: (data.comments || []).map((comment: any) => ({
-          ...comment,
-          createdAt: comment.createdAt.toDate()
+        comments: (data.comments || []).map((c: any) => ({
+          ...c,
+          createdAt: c.createdAt?.toDate?.() || new Date()
         }))
       });
     });

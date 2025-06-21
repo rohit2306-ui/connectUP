@@ -1,6 +1,16 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, PlusCircle, User, LogOut, Moon, Sun, MessageCircle } from 'lucide-react';
+import {
+  Home,
+  Search,
+  PlusCircle,
+  User,
+  LogOut,
+  Moon,
+  Sun,
+  MessageCircle,
+  Bell,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -21,6 +31,7 @@ const Navbar: React.FC = () => {
     { path: '/feed', icon: Home, label: 'Home' },
     { path: '/search', icon: Search, label: 'Search' },
     { path: '/create', icon: PlusCircle, label: 'Create' },
+    { path: '/notifications', icon: Bell, label: 'Notifications' }, // ✅ Added Notifications
     { path: '/dashboard', icon: User, label: 'Profile' },
   ];
 

@@ -24,20 +24,15 @@ const UserProfile: React.FC = () => {
       try {
         const foundUser = await getUserByUsername(username);
         if (!foundUser || !foundUser.id) {
-          console.error('User not found or missing ID');
           setNotFound(true);
           return;
         }
 
         setUser(foundUser);
 
-        console.log('Found user ID for post fetching:', foundUser.id);
         const posts = await getPostsByUserId(foundUser.id);
-
-        console.log('Posts fetched:', posts.length);
         setUserPosts(posts);
       } catch (error) {
-        console.error('Error loading user profile:', error);
         setNotFound(true);
       } finally {
         setLoading(false);
@@ -48,15 +43,15 @@ const UserProfile: React.FC = () => {
   }, [username]);
 
   const formatDate = (date: Date | string) => {
-  const parsedDate = new Date(date);
-  if (isNaN(parsedDate.getTime())) return 'Invalid date';
-
-  return parsedDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-};
+    const parsedDate = new Date(date);
+    return isNaN(parsedDate.getTime())
+      ? 'Invalid date'
+      : parsedDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+  };
 
   if (notFound) return <Navigate to="/search" replace />;
   if (loading) {
@@ -75,11 +70,7 @@ const UserProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => window.history.back()}
-          className="mb-6"
-        >
+        <Button variant="ghost" onClick={() => window.history.back()} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -89,11 +80,9 @@ const UserProfile: React.FC = () => {
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
               {user.name.charAt(0)}
             </div>
-
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{user.name}</h1>
               <p className="text-gray-600 dark:text-gray-400 mb-4">@{user.username}</p>
-
               <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center space-x-1">
                   <Calendar className="h-4 w-4" />
