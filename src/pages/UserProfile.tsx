@@ -7,13 +7,29 @@ import { getPostsByUserId } from '../services/postService';
 import PostCard from '../components/Post/PostCard';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Button from '../components/UI/Button';
+import { useAuth } from '../context/AuthContext';
+
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  doc,
+  updateDoc,
+  Timestamp
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const UserProfile: React.FC = () => {
   const { username } = useParams<{ username: string }>();
+  const { user: currentUser } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [connStatus, setConnStatus] = useState<'none' | 'pending' | 'friends'>('none');
+  const [connDocId, setConnDocId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -29,9 +45,12 @@ const UserProfile: React.FC = () => {
         }
 
         setUser(foundUser);
-
         const posts = await getPostsByUserId(foundUser.id);
         setUserPosts(posts);
+
+        if (currentUser?.id && foundUser.id !== currentUser.id) {
+          await checkConnection(currentUser.id, foundUser.id);
+        }
       } catch (error) {
         setNotFound(true);
       } finally {
@@ -41,6 +60,41 @@ const UserProfile: React.FC = () => {
 
     loadUserProfile();
   }, [username]);
+
+  const checkConnection = async (uidA: string, uidB: string) => {
+    const q = query(
+      collection(db, 'connections'),
+      where('userIdA', 'in', [uidA, uidB]),
+      where('userIdB', 'in', [uidA, uidB])
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const c = snap.docs[0];
+      const data = c.data();
+      setConnStatus(data.status);
+      setConnDocId(c.id);
+    }
+  };
+
+  const handleConnect = async () => {
+    if (!currentUser || !user || connStatus !== 'none') return;
+
+    const ref = await addDoc(collection(db, 'connections'), {
+      userIdA: currentUser.id,
+      userIdB: user.id,
+      status: 'pending'
+    });
+
+    await addDoc(collection(db, 'notifications'), {
+      toUserId: user.id,
+      fromUserId: currentUser.id,
+      type: 'connect_request',
+      createdAt: Timestamp.now()
+    });
+
+    setConnDocId(ref.id);
+    setConnStatus('pending');
+  };
 
   const formatDate = (date: Date | string) => {
     const parsedDate = new Date(date);
@@ -70,11 +124,32 @@ const UserProfile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <Button variant="ghost" onClick={() => window.history.back()} className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+        {/* Back Button and ConnectUp */}
+        <div className="flex justify-between items-center mb-6">
+          <Button variant="ghost" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
 
+          {/* ConnectUp Button */}
+          {currentUser?.id !== user.id && (
+            <Button
+              onClick={handleConnect}
+              disabled={connStatus !== 'none'}
+              className={`${
+                connStatus === 'pending' ? 'bg-yellow-500 text-white' :
+                connStatus === 'friends' ? 'bg-green-600 text-white' :
+                ''
+              }`}
+            >
+              {connStatus === 'none' && 'ConnectUp'}
+              {connStatus === 'pending' && 'Pending'}
+              {connStatus === 'friends' && 'Friends'}
+            </Button>
+          )}
+        </div>
+
+        {/* User Info */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
           <div className="flex items-start space-x-6">
             <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
@@ -97,6 +172,7 @@ const UserProfile: React.FC = () => {
           </div>
         </div>
 
+        {/* Posts */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
