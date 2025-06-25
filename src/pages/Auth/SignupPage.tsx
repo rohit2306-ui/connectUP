@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate ,useNavigate } from 'react-router-dom';
 import { MessageCircle, Eye, EyeOff, Check, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -61,19 +61,23 @@ const SignupPage: React.FC = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+  e.preventDefault();
 
-    const success = await signup(formData);
-    if (!success) {
-      setErrors({ general: 'Username or email already exists' });
-    }
-  };
+  if (!validateForm()) {
+    return;
+  }
+
+  const success = await signup(formData);
+  if (!success) {
+    setErrors({ general: 'Username or email already exists' });
+  } else {
+    navigate(`/profile/${formData.username}`); // or navigate('/dashboard') if you prefer
+  }
+};
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -99,7 +103,7 @@ const SignupPage: React.FC = () => {
     if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) return 4;
     return 3;
   };
-
+  
   const passwordStrength = getPasswordStrength();
   const strengthColors = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'];
   const strengthTexts = ['', 'Weak', 'Fair', 'Good', 'Strong'];

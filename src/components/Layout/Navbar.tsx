@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -13,17 +13,48 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { db } from '../../config/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
+
+  useEffect(() => {
+    if (!user) return;
+
+    const checkNewMessages = async () => {
+      const q = query(
+        collection(db, 'messages'),
+        where('to', '==', user.id),
+        where('seen', '==', false)
+      );
+      const snap = await getDocs(q);
+      setHasNewMessages(!snap.empty);
+    };
+
+    const checkNewNotifications = async () => {
+      const q = query(
+        collection(db, 'notifications'),
+        where('toUserId', '==', user.id),
+        where('seen', '==', false)
+      );
+      const snap = await getDocs(q);
+      setHasNewNotifications(!snap.empty);
+    };
+
+    checkNewMessages();
+    checkNewNotifications();
+  }, [user]);
 
   if (!user) return null;
 
@@ -31,7 +62,18 @@ const Navbar: React.FC = () => {
     { path: '/feed', icon: Home, label: 'Home' },
     { path: '/search', icon: Search, label: 'Search' },
     { path: '/create', icon: PlusCircle, label: 'Create' },
-    { path: '/notifications', icon: Bell, label: 'Notifications' }, // ✅ Added Notifications
+    {
+      path: '/notifications',
+      icon: Bell,
+      label: 'Notifications',
+      dot: hasNewNotifications,
+    },
+    {
+      path: '/allmessages',
+      icon: MessageCircle,
+      label: 'Messages',
+      dot: hasNewMessages,
+    },
     { path: '/dashboard', icon: User, label: 'Profile' },
   ];
 
@@ -47,17 +89,20 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {navItems.map(({ path, icon: Icon, label }) => (
+            {navItems.map(({ path, icon: Icon, label, dot }) => (
               <Link
                 key={path}
                 to={path}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                className={`relative flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                   location.pathname === path
                     ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
                     : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
                 <Icon className="h-4 w-4" />
+                {dot && (
+                  <span className="absolute top-0 right-0 -mt-1 -mr-1 w-2 h-2 bg-green-500 rounded-full"></span>
+                )}
                 <span>{label}</span>
               </Link>
             ))}
@@ -93,17 +138,20 @@ const Navbar: React.FC = () => {
         {/* Mobile Navigation */}
         <div className="md:hidden border-t border-gray-200 dark:border-gray-700">
           <div className="flex justify-around py-2">
-            {navItems.map(({ path, icon: Icon, label }) => (
+            {navItems.map(({ path, icon: Icon, label, dot }) => (
               <Link
                 key={path}
                 to={path}
-                className={`flex flex-col items-center py-2 px-3 rounded-md text-xs font-medium transition-colors duration-200 ${
+                className={`relative flex flex-col items-center py-2 px-3 rounded-md text-xs font-medium transition-colors duration-200 ${
                   location.pathname === path
                     ? 'text-blue-600 dark:text-blue-400'
                     : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
                 }`}
               >
                 <Icon className="h-5 w-5 mb-1" />
+                {dot && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+                )}
                 <span>{label}</span>
               </Link>
             ))}

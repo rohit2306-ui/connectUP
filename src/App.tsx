@@ -14,6 +14,9 @@ import Dashboard from './pages/Dashboard';
 import SearchUsers from './pages/SearchUsers';
 import UserProfile from './pages/UserProfile';
 import Notifications from './pages/Notifications';
+import ConnectUps from './pages/ConnectUps';
+import MessageUser from './pages/MessageUser';
+import AllMessages from './pages/AllMessages';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -82,6 +85,12 @@ function AppContent() {
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to={user ? "/feed" : "/"} replace />} />
+        <Route path="/connectups" element={<ConnectUps />} />
+        <Route path="/messageuser/:username" element={<MessageUser />} />
+        <Route path="/allmessages" element={<AllMessages />} />
+
+{/* <Route path="/settings" element={<Settings />} /> */}
+
       </Routes>
     </>
   );
