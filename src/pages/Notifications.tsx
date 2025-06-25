@@ -8,10 +8,10 @@ import {
   orderBy,
   getDocs,
   doc,
-  getDoc,
   updateDoc,
   addDoc,
-  Timestamp
+  getDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import Button from '../components/UI/Button';
 
@@ -21,7 +21,7 @@ interface Notif {
   fromUserId: string;
   type: string;
   createdAt: any;
-  fromUserName?: string; // Optional name field
+  fromUserName?: string;
 }
 
 interface Conn {
@@ -35,6 +35,7 @@ const Notifications: React.FC = () => {
   const { user } = useAuth();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [conns, setConns] = useState<Conn[]>([]);
+  const [accepted, setAccepted] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,25 +43,21 @@ const Notifications: React.FC = () => {
       if (!user) return;
 
       try {
-        // Fetch notifications
+        // Load notifications
         const nq = query(
           collection(db, 'notifications'),
           where('toUserId', '==', user.id),
           orderBy('createdAt', 'desc')
         );
         const nqSnap = await getDocs(nq);
-        const rawNotifs = nqSnap.docs.map(d => ({
-          id: d.id,
-          ...(d.data() as Notif)
-        }));
+        const rawNotifs = nqSnap.docs.map(d => ({ id: d.id, ...(d.data() as Notif) }));
 
-        // Fetch fromUser names in parallel
+        // Load usernames
         const userIds = Array.from(new Set(rawNotifs.map(n => n.fromUserId)));
         const userDocs = await Promise.all(
           userIds.map(uid => getDoc(doc(db, 'users', uid)))
         );
-
-        const userMap: { [uid: string]: string } = {};
+        const userMap: { [id: string]: string } = {};
         userDocs.forEach((docSnap, idx) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -68,23 +65,22 @@ const Notifications: React.FC = () => {
           }
         });
 
-        // Add names to notifications
-        const enrichedNotifs = rawNotifs.map(n => ({
+        // Add usernames into notifications
+        const enriched = rawNotifs.map(n => ({
           ...n,
-          fromUserName: userMap[n.fromUserId] || n.fromUserId
+          fromUserName: userMap[n.fromUserId] || n.fromUserId,
         }));
 
-        setNotifs(enrichedNotifs);
+        setNotifs(enriched);
 
-        // Fetch connections
+        // Load pending connections
         const cq = query(
           collection(db, 'connections'),
           where('userIdB', '==', user.id),
           where('status', '==', 'pending')
         );
         const cqSnap = await getDocs(cq);
-        setConns(cqSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
-
+        setConns(cqSnap.docs.map(d => ({ id: d.id, ...(d.data() as Conn) })));
       } catch (err) {
         console.error('Error fetching notifications:', err);
       } finally {
@@ -96,47 +92,76 @@ const Notifications: React.FC = () => {
   }, [user]);
 
   const accept = async (n: Notif) => {
-    const conn = conns.find(
-      c => c.userIdA === n.fromUserId && c.userIdB === user!.id
-    );
+  const conn = conns.find(
+    c =>
+      (c.userIdA === n.fromUserId && c.userIdB === user!.id) ||
+      (c.userIdB === n.fromUserId && c.userIdA === user!.id)
+  );
 
-    if (!conn) {
-      alert("Connection not found for this request.");
-      return;
-    }
+  if (!conn) return;
 
-    await updateDoc(doc(db, 'connections', conn.id), { status: 'friends' });
+  // ✅ Step 1: Update the connection to 'friends'
+  await updateDoc(doc(db, 'connections', conn.id), { status: 'friends' });
 
-    await addDoc(collection(db, 'notifications'), {
-      toUserId: conn.userIdA,
-      fromUserId: user!.id,
-      type: 'connect_accepted',
-      createdAt: Timestamp.now()
-    });
+  // ✅ Step 2: Add 'connect_accepted' notification
+  await addDoc(collection(db, 'notifications'), {
+    toUserId: conn.userIdA,
+    fromUserId: user!.id,
+    type: 'connect_accepted',
+    createdAt: Timestamp.now(),
+  });
 
-    setConns(prev => prev.filter(c => c.id !== conn.id));
-  };
+  // ✅ Step 3: Remove connection from pending list
+  setConns(prev => prev.filter(c => c.id !== conn.id));
+
+  // ✅ Step 4: Convert this notification to 'connect_accepted'
+  setNotifs(prev =>
+    prev.map(item =>
+      item.id === n.id
+        ? { ...item, type: 'connect_accepted' } // convert in-place
+        : item
+    )
+  );
+};
+
 
   const renderMessage = (n: Notif) => {
-    const name = n.fromUserName || n.fromUserId;
-    switch (n.type) {
-      case 'connect_request':
-        return (
-          <div className="flex justify-between items-center">
-            <span>👋 <strong>{name}</strong> sent you a connect request.</span>
-            <Button size="sm" onClick={() => accept(n)}>Accept</Button>
-          </div>
-        );
-      case 'connect_accepted':
-        return <span>✅ <strong>{name}</strong> accepted your request.</span>;
-      case 'like':
-        return <span>❤️ <strong>{name}</strong> liked your post.</span>;
-      case 'comment':
-        return <span>💬 <strong>{name}</strong> commented on your post.</span>;
-      default:
-        return <span>🔔 You have a new notification.</span>;
-    }
-  };
+  const name = n.fromUserName || n.fromUserId;
+
+  const isStillPending = conns.some(
+    c =>
+      (c.userIdA === n.fromUserId && c.userIdB === user?.id) ||
+      (c.userIdB === n.fromUserId && c.userIdA === user?.id)
+  );
+
+  if (n.type === 'connect_accepted') {
+    return <span>👥 <strong>{name}</strong> is now your friend.</span>;
+  }
+
+  if (n.type === 'connect_request') {
+    return isStillPending ? (
+      <div className="flex justify-between items-center">
+        <span>👋 <strong>{name}</strong> sent you a connect request.</span>
+        <Button size="sm" onClick={() => accept(n)}>Accept</Button>
+      </div>
+    ) : (
+      <span>👥 <strong>{name}</strong> is now your friend.</span>
+    );
+  }
+
+  if (n.type === 'like') {
+    return <span>❤️ <strong>{name}</strong> liked your post.</span>;
+  }
+
+  if (n.type === 'comment') {
+    return <span>💬 <strong>{name}</strong> commented on your post.</span>;
+  }
+
+  return <span>🔔 You have a new notification.</span>;
+};
+
+
+
 
   return (
     <div className="p-6 max-w-xl mx-auto min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
@@ -149,7 +174,10 @@ const Notifications: React.FC = () => {
       ) : (
         <ul className="space-y-3">
           {notifs.map(n => (
-            <li key={n.id} className="p-4 bg-white dark:bg-gray-800 rounded shadow border border-gray-200 dark:border-gray-700">
+            <li
+              key={n.id}
+              className="p-4 bg-white dark:bg-gray-800 rounded shadow border border-gray-200 dark:border-gray-700"
+            >
               {renderMessage(n)}
             </li>
           ))}
