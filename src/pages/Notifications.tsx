@@ -8,6 +8,7 @@ import {
   orderBy,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
   addDoc,
   Timestamp
@@ -20,6 +21,7 @@ interface Notif {
   fromUserId: string;
   type: string;
   createdAt: any;
+  fromUserName?: string; // Optional name field
 }
 
 interface Conn {
@@ -40,14 +42,41 @@ const Notifications: React.FC = () => {
       if (!user) return;
 
       try {
+        // Fetch notifications
         const nq = query(
           collection(db, 'notifications'),
           where('toUserId', '==', user.id),
           orderBy('createdAt', 'desc')
         );
         const nqSnap = await getDocs(nq);
-        setNotifs(nqSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+        const rawNotifs = nqSnap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() as Notif)
+        }));
 
+        // Fetch fromUser names in parallel
+        const userIds = Array.from(new Set(rawNotifs.map(n => n.fromUserId)));
+        const userDocs = await Promise.all(
+          userIds.map(uid => getDoc(doc(db, 'users', uid)))
+        );
+
+        const userMap: { [uid: string]: string } = {};
+        userDocs.forEach((docSnap, idx) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            userMap[userIds[idx]] = data.name || 'Unknown';
+          }
+        });
+
+        // Add names to notifications
+        const enrichedNotifs = rawNotifs.map(n => ({
+          ...n,
+          fromUserName: userMap[n.fromUserId] || n.fromUserId
+        }));
+
+        setNotifs(enrichedNotifs);
+
+        // Fetch connections
         const cq = query(
           collection(db, 'connections'),
           where('userIdB', '==', user.id),
@@ -55,53 +84,55 @@ const Notifications: React.FC = () => {
         );
         const cqSnap = await getDocs(cq);
         setConns(cqSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+
       } catch (err) {
         console.error('Error fetching notifications:', err);
       } finally {
         setLoading(false);
       }
     };
+
     load();
   }, [user]);
 
   const accept = async (n: Notif) => {
-  const conn = conns.find(
-    c => c.userIdA === n.fromUserId && c.userIdB === user!.id
-  );
+    const conn = conns.find(
+      c => c.userIdA === n.fromUserId && c.userIdB === user!.id
+    );
 
-  if (!conn) {
-    alert("Connection not found for this request. Possible mismatch.");
-    return;
-  }
+    if (!conn) {
+      alert("Connection not found for this request.");
+      return;
+    }
 
-  await updateDoc(doc(db, 'connections', conn.id), { status: 'friends' });
+    await updateDoc(doc(db, 'connections', conn.id), { status: 'friends' });
 
-  await addDoc(collection(db, 'notifications'), {
-    toUserId: conn.userIdA,
-    fromUserId: user!.id,
-    type: 'connect_accepted',
-    createdAt: Timestamp.now()
-  });
+    await addDoc(collection(db, 'notifications'), {
+      toUserId: conn.userIdA,
+      fromUserId: user!.id,
+      type: 'connect_accepted',
+      createdAt: Timestamp.now()
+    });
 
-  setConns(prev => prev.filter(c => c.id !== conn.id));
-};
-
+    setConns(prev => prev.filter(c => c.id !== conn.id));
+  };
 
   const renderMessage = (n: Notif) => {
+    const name = n.fromUserName || n.fromUserId;
     switch (n.type) {
       case 'connect_request':
         return (
           <div className="flex justify-between items-center">
-            <span>👋 {n.fromUserId} sent you a connect request.</span>
+            <span>👋 <strong>{name}</strong> sent you a connect request.</span>
             <Button size="sm" onClick={() => accept(n)}>Accept</Button>
           </div>
         );
       case 'connect_accepted':
-        return <span>✅ {n.fromUserId} accepted your request.</span>;
+        return <span>✅ <strong>{name}</strong> accepted your request.</span>;
       case 'like':
-        return <span>❤️ {n.fromUserId} liked your post.</span>;
+        return <span>❤️ <strong>{name}</strong> liked your post.</span>;
       case 'comment':
-        return <span>💬 {n.fromUserId} commented on your post.</span>;
+        return <span>💬 <strong>{name}</strong> commented on your post.</span>;
       default:
         return <span>🔔 You have a new notification.</span>;
     }
