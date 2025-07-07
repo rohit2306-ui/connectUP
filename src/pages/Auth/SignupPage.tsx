@@ -173,7 +173,7 @@ const SignupPage: React.FC = () => {
               onChange={handleChange}
               placeholder="Choose a unique username"
               error={errors.username}
-              helperText="Username must be unique (like Instagram)"
+              
               required
             />
 
